@@ -1,0 +1,96 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "mobile-entry",
+      "listen": "0.0.0.0",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "__CLIENT_UUID__",
+            "flow": "xtls-rprx-vision",
+            "email": "primary-mobile"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "target": "__RELAY_TARGET__",
+          "xver": 0,
+          "serverNames": [
+            "__RELAY_SNI__"
+          ],
+          "privateKey": "__RELAY_PRIVATE_KEY__",
+          "shortIds": [
+            "__RELAY_SHORT_ID__"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ],
+        "routeOnly": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "foreign-exit",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "__FOREIGN_IP__",
+            "port": 443,
+            "users": [
+              {
+                "id": "__HOP_UUID__",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "__FOREIGN_SNI__",
+          "fingerprint": "chrome",
+          "password": "__FOREIGN_PUBLIC_KEY__",
+          "shortId": "__FOREIGN_SHORT_ID__",
+          "spiderX": "/"
+        }
+      }
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "mobile-entry"
+        ],
+        "outboundTag": "foreign-exit"
+      }
+    ]
+  }
+}

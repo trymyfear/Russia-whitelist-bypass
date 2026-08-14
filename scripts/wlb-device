@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config=/opt/whitelist-bypass/relay/config/config.json
+xray=/opt/whitelist-bypass/relay/bin/xray
+service=whitelist-bypass-relay.service
+lock=/run/lock/whitelist-bypass-device.lock
+
+usage() {
+  echo "usage: wlb-device list | add <name> <uuid> | remove <name>" >&2
+  exit 2
+}
+
+command_name="${1:-}"
+device_name="${2:-}"
+device_uuid="${3:-}"
+
+case "$command_name" in
+  list)
+    python3 - "$config" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    config = json.load(source)
+for client in config["inbounds"][0]["settings"]["clients"]:
+    print(f'{client.get("email", "-")}\t{client["id"]}')
+PY
+    exit 0
+    ;;
+  add|remove)
+    [[ "$device_name" =~ ^[A-Za-z0-9._-]{1,48}$ ]] || {
+      echo "invalid device name; use A-Z, a-z, 0-9, dot, underscore, or dash" >&2
+      exit 2
+    }
+    ;;
+  *) usage ;;
+esac
+
+if [[ "$command_name" == add ]]; then
+  [[ "$device_uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || {
+    echo "invalid UUID" >&2
+    exit 2
+  }
+fi
+
+exec 9>"$lock"
+flock -x 9
+backup="$(mktemp /tmp/wlb-relay-config.XXXXXX)"
+trap 'rm -f "$backup"' EXIT
+cp -- "$config" "$backup"
+
+python3 - "$command_name" "$device_name" "$device_uuid" "$config" <<'PY'
+import json
+import os
+import pathlib
+import sys
+import tempfile
+
+command_name, name, uuid, config_path = sys.argv[1:]
+path = pathlib.Path(config_path)
+with path.open(encoding="utf-8") as source:
+    config = json.load(source)
+clients = config["inbounds"][0]["settings"]["clients"]
+
+if command_name == "add":
+    if any(item.get("email") == name for item in clients):
+        raise SystemExit(f"device already exists: {name}")
+    if any(item.get("id") == uuid for item in clients):
+        raise SystemExit("UUID already exists")
+    clients.append({"id": uuid, "flow": "xtls-rprx-vision", "email": name})
+elif command_name == "remove":
+    if name == "primary-mobile":
+        raise SystemExit("refusing to remove the primary device")
+    retained = [item for item in clients if item.get("email") != name]
+    if len(retained) == len(clients):
+        raise SystemExit(f"device not found: {name}")
+    config["inbounds"][0]["settings"]["clients"] = retained
+
+fd, temp_name = tempfile.mkstemp(prefix=".config.", suffix=".json", dir=path.parent)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as target:
+        json.dump(config, target, ensure_ascii=False, indent=2)
+        target.write("\n")
+        target.flush()
+        os.fsync(target.fileno())
+    os.replace(temp_name, path)
+finally:
+    if os.path.exists(temp_name):
+        os.unlink(temp_name)
+PY
+
+chown root:whitelist-bypass "$config"
+chmod 0640 "$config"
+if ! "$xray" run -test -config "$config"; then
+  install -o root -g whitelist-bypass -m 0640 "$backup" "$config"
+  echo "configuration validation failed; original restored" >&2
+  exit 1
+fi
+
+systemctl restart "$service"
+systemctl is-active --quiet "$service"
+echo "$command_name OK: $device_name"

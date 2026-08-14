@@ -1,0 +1,28 @@
+[Unit]
+Description=Whitelist Bypass Russian Xray relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=whitelist-bypass
+Group=whitelist-bypass
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+LimitNOFILE=1048576
+ExecStart=/opt/whitelist-bypass/relay/bin/xray run -config /opt/whitelist-bypass/relay/config/config.json
+Restart=on-failure
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
+

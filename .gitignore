@@ -1,0 +1,35 @@
+# Secrets and private credentials
+.secrets/
+*.key
+*.pem
+*.pub
+id_*
+known_hosts
+
+# Local environment and private configs
+.env
+config.env
+!config.env.example
+deployment.env
+
+# Client configurations, generated links and QR codes
+artifacts/
+
+# Private project state with personal cloud/billing IDs
+PROJECT_STATE.md
+PLAN.md
+RUNBOOK.md
+
+# Python cache & logs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+/tmp/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

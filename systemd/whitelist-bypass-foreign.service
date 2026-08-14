@@ -1,0 +1,28 @@
+[Unit]
+Description=Whitelist Bypass foreign Xray exit
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=whitelist-bypass
+Group=whitelist-bypass
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+LimitNOFILE=1048576
+ExecStart=/opt/whitelist-bypass/foreign/bin/xray run -config /opt/whitelist-bypass/foreign/config/config.json
+Restart=on-failure
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
+
